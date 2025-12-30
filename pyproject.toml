@@ -12,4 +12,5 @@ dependencies = [
     "duckdb>=0.9.0",
     "streamlit>=1.28.0",
     "jupyter>=1.0.0",
+    "psycopg2-binary>=2.9.11",
 ]

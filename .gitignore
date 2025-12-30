@@ -23,6 +23,8 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+__pycache__/
+
 
 # Jupyter Notebook
 .ipynb_checkpoints
@@ -60,4 +62,5 @@ Thumbs.db
 
 # uv
 .uv/
+uv.lock
 

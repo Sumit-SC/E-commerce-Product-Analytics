@@ -107,3 +107,6 @@ uv run streamlit run streamlit/ab_test_inspector.py
 
 **Note:** This project is designed to demonstrate real-world analytics skills with intentionally messy data to showcase data cleaning and analysis capabilities.
 
+## Enhancements 
+
+“For datasets exceeding local memory constraints, this pipeline can be optimized using Polars or DuckDB SQL, both of which offer vectorized execution and lower memory overhead.”
