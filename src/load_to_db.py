@@ -117,6 +117,7 @@ def load_events_table(conn: duckdb.DuckDBPyConnection, csv_path: Path):
 def load_orders_table(conn: duckdb.DuckDBPyConnection, csv_path: Path):
     """
     Load orders CSV into orders_raw table with proper schema.
+    Adds product_category by joining with events_raw.
     
     Args:
         conn: DuckDB connection
@@ -127,9 +128,9 @@ def load_orders_table(conn: duckdb.DuckDBPyConnection, csv_path: Path):
     # Read CSV
     df = pd.read_csv(csv_path)
     
-    # Create table with explicit schema
+    # Create temporary table first
     conn.execute("""
-        CREATE OR REPLACE TABLE orders_raw AS
+        CREATE OR REPLACE TABLE orders_temp AS
         SELECT
             CAST(order_id AS VARCHAR) AS order_id,
             CAST(user_id AS INTEGER) AS user_id,
@@ -141,6 +142,31 @@ def load_orders_table(conn: duckdb.DuckDBPyConnection, csv_path: Path):
             CAST(payment_status AS VARCHAR) AS payment_status
         FROM df
     """)
+    
+    # Create final table with product_category from events
+    conn.execute("""
+        CREATE OR REPLACE TABLE orders_raw AS
+        SELECT
+            o.order_id,
+            o.user_id,
+            o.product_id,
+            COALESCE(e.product_category, 'unknown') AS product_category,
+            o.price,
+            o.quantity,
+            o.discount_amount,
+            o.ts,
+            o.payment_status
+        FROM orders_temp o
+        LEFT JOIN (
+            SELECT DISTINCT product_id, product_category
+            FROM events_raw
+            WHERE product_id IS NOT NULL
+            AND product_category IS NOT NULL
+        ) e ON o.product_id = e.product_id
+    """)
+    
+    # Drop temporary table
+    conn.execute("DROP TABLE IF EXISTS orders_temp")
     
     # Create indexes
     conn.execute("CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders_raw(user_id)")
