@@ -1,0 +1,14 @@
+# Requirements file for compatibility
+# Note: This project uses uv for package management (see pyproject.toml)
+# To install dependencies: uv sync
+# Or use pip: pip install -r requirements.txt
+
+pandas>=2.0.0
+numpy>=1.24.0
+scipy>=1.10.0
+matplotlib>=3.7.0
+seaborn>=0.12.0
+duckdb>=0.9.0
+streamlit>=1.28.0
+jupyter>=1.0.0
+
