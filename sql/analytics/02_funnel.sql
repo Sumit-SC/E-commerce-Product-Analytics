@@ -5,12 +5,9 @@
 --          for each stage (visit, product_view, add_to_cart, checkout, purchase)
 --
 -- Database: DuckDB
--- Source: sessions_enriched (or user_sessions if sessions_enriched doesn't exist)
+-- Source: user_sessions (from sessionization script)
 -- Output: funnel_sessions (one row per session with funnel flags)
 -- ============================================================================
-
--- Note: If sessions_enriched doesn't exist, replace with user_sessions
---       from the sessionization script output
 
 CREATE OR REPLACE TABLE funnel_sessions AS
 SELECT
@@ -69,7 +66,7 @@ SELECT
     -- Distinct products viewed
     COUNT(DISTINCT CASE WHEN product_id IS NOT NULL THEN product_id END) AS distinct_products_viewed
 
-FROM sessions_enriched
+FROM user_sessions
 GROUP BY
     user_id,
     session_index

@@ -37,7 +37,7 @@ WHERE o.payment_status = 'success'
 
 ORDER BY
     cohort_week,
-    user_id,
+    o.user_id,
     activity_week;
 
 -- ============================================================================
