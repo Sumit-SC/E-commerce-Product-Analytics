@@ -40,36 +40,36 @@ SELECT
     SUM(has_checkout) AS sessions_with_checkout,
     SUM(has_purchase) AS sessions_with_purchase,
     
-    -- Conversion rates (as percentages)
+    -- Conversion rates (as ratios 0-1, let Power BI format as %)
     -- Visit → Product View
     ROUND(
-        CAST(SUM(has_product_view) AS DOUBLE) / NULLIF(SUM(has_visit), 0) * 100,
-        2
-    ) AS visit_to_product_view_pct,
+        CAST(SUM(has_product_view) AS DOUBLE) / NULLIF(SUM(has_visit), 0),
+        4
+    ) AS visit_to_product_view_rate,
     
     -- Product View → Add to Cart
     ROUND(
-        CAST(SUM(has_add_to_cart) AS DOUBLE) / NULLIF(SUM(has_product_view), 0) * 100,
-        2
-    ) AS product_view_to_cart_pct,
+        CAST(SUM(has_add_to_cart) AS DOUBLE) / NULLIF(SUM(has_product_view), 0),
+        4
+    ) AS product_view_to_cart_rate,
     
     -- Add to Cart → Checkout
     ROUND(
-        CAST(SUM(has_checkout) AS DOUBLE) / NULLIF(SUM(has_add_to_cart), 0) * 100,
-        2
-    ) AS cart_to_checkout_pct,
+        CAST(SUM(has_checkout) AS DOUBLE) / NULLIF(SUM(has_add_to_cart), 0),
+        4
+    ) AS cart_to_checkout_rate,
     
     -- Checkout → Purchase
     ROUND(
-        CAST(SUM(has_purchase) AS DOUBLE) / NULLIF(SUM(has_checkout), 0) * 100,
-        2
-    ) AS checkout_to_purchase_pct,
+        CAST(SUM(has_purchase) AS DOUBLE) / NULLIF(SUM(has_checkout), 0),
+        4
+    ) AS checkout_to_purchase_rate,
     
     -- Overall conversion: Visit → Purchase
     ROUND(
-        CAST(SUM(has_purchase) AS DOUBLE) / NULLIF(SUM(has_visit), 0) * 100,
-        2
-    ) AS visit_to_purchase_pct
+        CAST(SUM(has_purchase) AS DOUBLE) / NULLIF(SUM(has_visit), 0),
+        4
+    ) AS visit_to_purchase_rate
 
 FROM funnel_sessions
 GROUP BY
@@ -124,18 +124,11 @@ SELECT
     rc.users_active,
     cs.cohort_size,
     
-    -- Retention rate as decimal (0.0 to 1.0)
-    -- Power BI can format this as percentage
+    -- Retention rate as ratio (0.0 to 1.0, let Power BI format as %)
     ROUND(
         CAST(rc.users_active AS DOUBLE) / NULLIF(cs.cohort_size, 0),
         4
-    ) AS retention_rate,
-    
-    -- Retention rate as percentage (0 to 100) for convenience
-    ROUND(
-        CAST(rc.users_active AS DOUBLE) / NULLIF(cs.cohort_size, 0) * 100,
-        2
-    ) AS retention_rate_pct
+    ) AS retention_rate
 
 FROM retention_counts rc
 INNER JOIN cohort_sizes cs
@@ -168,29 +161,29 @@ SELECT
     SUM(has_checkout) AS sessions_with_checkout,
     SUM(has_purchase) AS sessions_with_purchase,
     
-    -- Conversion rates (as percentages)
+    -- Conversion rates (as ratios 0-1, let Power BI format as %)
     -- Overall: Visit → Purchase
     ROUND(
-        CAST(SUM(has_purchase) AS DOUBLE) / NULLIF(COUNT(*), 0) * 100,
-        2
-    ) AS visit_to_purchase_pct,
+        CAST(SUM(has_purchase) AS DOUBLE) / NULLIF(COUNT(*), 0),
+        4
+    ) AS visit_to_purchase_rate,
     
     -- Primary metric: Checkout → Purchase
     ROUND(
-        CAST(SUM(has_purchase) AS DOUBLE) / NULLIF(SUM(has_checkout), 0) * 100,
-        2
-    ) AS checkout_to_purchase_pct,
+        CAST(SUM(has_purchase) AS DOUBLE) / NULLIF(SUM(has_checkout), 0),
+        4
+    ) AS checkout_to_purchase_rate,
     
     -- Other funnel steps for context
     ROUND(
-        CAST(SUM(has_checkout) AS DOUBLE) / NULLIF(COUNT(*), 0) * 100,
-        2
-    ) AS visit_to_checkout_pct,
+        CAST(SUM(has_checkout) AS DOUBLE) / NULLIF(COUNT(*), 0),
+        4
+    ) AS visit_to_checkout_rate,
     
     ROUND(
-        CAST(SUM(has_add_to_cart) AS DOUBLE) / NULLIF(COUNT(*), 0) * 100,
-        2
-    ) AS visit_to_cart_pct
+        CAST(SUM(has_add_to_cart) AS DOUBLE) / NULLIF(COUNT(*), 0),
+        4
+    ) AS visit_to_cart_rate
 
 FROM funnel_sessions
 WHERE variant IS NOT NULL
