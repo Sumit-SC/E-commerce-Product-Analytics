@@ -146,7 +146,7 @@ cd E-commerce-Product-Analytics
 # Windows: powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
 # macOS/Linux: curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# Create virtual environment and install dependencies
+# Install dependencies (creates .venv and installs packages from pyproject.toml)
 uv sync
 
 # Run the pipeline
