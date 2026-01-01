@@ -1,0 +1,3 @@
+ab_test_id,variant,total_sessions,sessions_with_checkout,sessions_with_purchase,visit_to_purchase_rate,checkout_to_purchase_rate,visit_to_checkout_rate,visit_to_cart_rate
+checkout_layout_test_1,control,23481,23481.0,20025.0,0.8528,0.8528,1.0,1.0
+checkout_layout_test_1,variant,23522,23522.0,21555.0,0.9164,0.9164,1.0,1.0
