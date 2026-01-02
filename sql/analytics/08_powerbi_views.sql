@@ -3,12 +3,14 @@
 -- ============================================================================
 -- Purpose: Create optimized views for Power BI dashboards
 --          - Funnel metrics (aggregated)
---          - Cohort retention rates
+--          - Cohort retention rates (from user-based retention tables)
 --          - A/B test summary
 --
 -- Database: DuckDB
--- Source: funnel_sessions, purchase_cohorts
+-- Source: funnel_sessions, cohort_retention_rates, cohort_sizes
 -- Output: Views (not tables) for Power BI consumption
+--
+-- IMPORTANT: Run AFTER materialize_tables.py to ensure source tables exist
 -- ============================================================================
 
 -- ============================================================================
@@ -82,10 +84,12 @@ ORDER BY
     device;
 
 -- ============================================================================
--- View 2: Cohort Retention Rates
+-- View 2: Cohort Retention Rates (User-Based)
 -- ============================================================================
 -- Purpose: Provide cohort retention data for heatmaps and retention curves
---          Uses the same logic as 05_cohort_retention_rates.sql
+--          Uses the CORRECTED user-based retention logic:
+--          - Cohort size = ALL users who signed up (not just purchasers)
+--          - Retention rate is ALWAYS between 0 and 1
 --
 -- Usage in Power BI:
 --   - Retention heatmap (cohort_week vs cohort_index)
@@ -94,49 +98,21 @@ ORDER BY
 -- ============================================================================
 
 CREATE OR REPLACE VIEW v_cohort_retention AS
-WITH retention_counts AS (
-    -- Calculate retention counts (users active per cohort and period)
-    SELECT
-        cohort_week,
-        DATEDIFF('week', cohort_week, activity_week) AS cohort_index,
-        COUNT(DISTINCT user_id) AS users_active
-    FROM purchase_cohorts
-    WHERE DATEDIFF('week', cohort_week, activity_week) >= 0
-    GROUP BY
-        cohort_week,
-        cohort_index
-),
-
-cohort_sizes AS (
-    -- Calculate cohort size (users in signup week, cohort_index = 0)
-    SELECT
-        cohort_week,
-        COUNT(DISTINCT user_id) AS cohort_size
-    FROM purchase_cohorts
-    WHERE DATEDIFF('week', cohort_week, activity_week) = 0
-    GROUP BY
-        cohort_week
-)
-
 SELECT
-    rc.cohort_week,
-    rc.cohort_index,
-    rc.users_active,
-    cs.cohort_size,
+    -- Cohort identification
+    cohort_week,
+    cohort_index,
     
-    -- Retention rate as ratio (0.0 to 1.0, let Power BI format as %)
-    ROUND(
-        CAST(rc.users_active AS DOUBLE) / NULLIF(cs.cohort_size, 0),
-        4
-    ) AS retention_rate
-
-FROM retention_counts rc
-INNER JOIN cohort_sizes cs
-    ON rc.cohort_week = cs.cohort_week
+    -- Metrics
+    users_active,
+    cohort_size,
+    retention_rate
+    
+FROM cohort_retention_rates
 
 ORDER BY
-    rc.cohort_week,
-    rc.cohort_index;
+    cohort_week,
+    cohort_index;
 
 -- ============================================================================
 -- View 3: A/B Test Summary
@@ -250,8 +226,9 @@ ORDER BY
 -- Test funnel metrics view
 -- SELECT * FROM v_funnel_metrics LIMIT 10;
 
--- Test cohort retention view
+-- Test cohort retention view - verify all retention rates are <= 1
 -- SELECT * FROM v_cohort_retention WHERE cohort_index <= 4 LIMIT 20;
+-- SELECT * FROM v_cohort_retention WHERE retention_rate > 1.0;  -- Should return 0 rows
 
 -- Test A/B test summary view
 -- SELECT * FROM v_ab_test_summary;

@@ -4,7 +4,11 @@ Materialize Analytics Tables in DuckDB
 This script executes SQL files to create analytics tables:
 1. user_sessions - Sessionized events from raw clickstream
 2. funnel_sessions - Session-level funnel flags
-3. purchase_cohorts - Cohort base table for retention analysis
+3. cohort_users - User cohorts by signup week
+4. cohort_activity - Weekly purchase activity (deduplicated)
+5. cohort_retention - Retention counts by cohort and period
+6. cohort_sizes - Total users per cohort
+7. cohort_retention_rates - Final retention rates table
 """
 
 import duckdb
@@ -121,15 +125,92 @@ def main():
     print(f"  [OK] Created funnel_sessions with {row_count:,} rows")
     print()
     
-    # Table 3: purchase_cohorts
-    print("Creating purchase_cohorts table...")
-    print("  Source: sql/analytics/03_cohorts.sql")
-    sql_file = sql_dir / "03_cohorts.sql"
+    # =========================================================================
+    # COHORT TABLES (User-based retention analysis)
+    # =========================================================================
+    
+    # Table 3: cohort_users
+    print("Creating cohort_users table...")
+    print("  Source: sql/analytics/03_cohort_users.sql")
+    sql_file = sql_dir / "03_cohort_users.sql"
     sql = load_sql_file(sql_file)
     conn.execute(sql)
     
-    row_count = conn.execute("SELECT COUNT(*) FROM purchase_cohorts").fetchone()[0]
-    print(f"  [OK] Created purchase_cohorts with {row_count:,} rows")
+    row_count = conn.execute("SELECT COUNT(*) FROM cohort_users").fetchone()[0]
+    print(f"  [OK] Created cohort_users with {row_count:,} rows")
+    print()
+    
+    # Table 4: cohort_activity
+    print("Creating cohort_activity table...")
+    print("  Source: sql/analytics/04_cohort_activity.sql")
+    sql_file = sql_dir / "04_cohort_activity.sql"
+    sql = load_sql_file(sql_file)
+    conn.execute(sql)
+    
+    row_count = conn.execute("SELECT COUNT(*) FROM cohort_activity").fetchone()[0]
+    print(f"  [OK] Created cohort_activity with {row_count:,} rows")
+    print()
+    
+    # Table 5: cohort_retention
+    print("Creating cohort_retention table...")
+    print("  Source: sql/analytics/05_cohort_retention.sql")
+    sql_file = sql_dir / "05_cohort_retention.sql"
+    sql = load_sql_file(sql_file)
+    conn.execute(sql)
+    
+    row_count = conn.execute("SELECT COUNT(*) FROM cohort_retention").fetchone()[0]
+    print(f"  [OK] Created cohort_retention with {row_count:,} rows")
+    print()
+    
+    # Table 6: cohort_sizes
+    print("Creating cohort_sizes table...")
+    print("  Source: sql/analytics/06_cohort_sizes.sql")
+    sql_file = sql_dir / "06_cohort_sizes.sql"
+    sql = load_sql_file(sql_file)
+    conn.execute(sql)
+    
+    row_count = conn.execute("SELECT COUNT(*) FROM cohort_sizes").fetchone()[0]
+    print(f"  [OK] Created cohort_sizes with {row_count:,} rows")
+    print()
+    
+    # Table 7: cohort_retention_rates
+    print("Creating cohort_retention_rates table...")
+    print("  Source: sql/analytics/07_cohort_retention_rates.sql")
+    sql_file = sql_dir / "07_cohort_retention_rates.sql"
+    sql = load_sql_file(sql_file)
+    conn.execute(sql)
+    
+    row_count = conn.execute("SELECT COUNT(*) FROM cohort_retention_rates").fetchone()[0]
+    print(f"  [OK] Created cohort_retention_rates with {row_count:,} rows")
+    print()
+    
+    # =========================================================================
+    # VALIDATION: Ensure retention rates are valid
+    # =========================================================================
+    print("Validating cohort retention rates...")
+    
+    # Check for any retention > 1 (should be 0)
+    invalid_count = conn.execute("""
+        SELECT COUNT(*) FROM cohort_retention_rates WHERE retention_rate > 1.0
+    """).fetchone()[0]
+    
+    if invalid_count > 0:
+        print(f"  [WARNING] Found {invalid_count} rows with retention_rate > 100%!")
+    else:
+        print("  [OK] All retention rates are valid (0-100%)")
+    
+    # Show week 0 retention (conversion rate)
+    week0_stats = conn.execute("""
+        SELECT 
+            AVG(retention_rate) AS avg_week0,
+            MIN(retention_rate) AS min_week0,
+            MAX(retention_rate) AS max_week0
+        FROM cohort_retention_rates 
+        WHERE cohort_index = 0
+    """).fetchone()
+    
+    print(f"  Week 0 retention (conversion): avg={week0_stats[0]:.2%}, "
+          f"min={week0_stats[1]:.2%}, max={week0_stats[2]:.2%}")
     print()
     
     # Summary
@@ -139,7 +220,11 @@ def main():
     print("All analytics tables created successfully:")
     print("  - user_sessions")
     print("  - funnel_sessions")
-    print("  - purchase_cohorts")
+    print("  - cohort_users")
+    print("  - cohort_activity")
+    print("  - cohort_retention")
+    print("  - cohort_sizes")
+    print("  - cohort_retention_rates")
     print()
     
     conn.close()
@@ -148,4 +233,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

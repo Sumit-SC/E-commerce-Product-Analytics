@@ -12,10 +12,12 @@ sql/
 └── analytics/                  # Core analytics transformations
     ├── 01_sessionization.sql   # Session creation with 30-min timeout
     ├── 02_funnel.sql           # Session-level funnel flags
-    ├── 03_cohorts.sql          # Cohort base table
-    ├── 04_cohort_retention_query.sql   # Retention counts (query only)
-    ├── 05_cohort_retention_rates.sql   # Retention percentages (query only)
-    └── 06_powerbi_views.sql    # BI-ready views for Power BI
+    ├── 03_cohort_users.sql     # User cohorts by signup week
+    ├── 04_cohort_activity.sql  # Weekly purchase activity (deduplicated)
+    ├── 05_cohort_retention.sql # Retention counts by cohort and period
+    ├── 06_cohort_sizes.sql     # Total users per cohort
+    ├── 07_cohort_retention_rates.sql  # Final retention rates
+    └── 08_powerbi_views.sql    # BI-ready views for Power BI
 ```
 
 ---
@@ -25,22 +27,49 @@ sql/
 Scripts must be executed in order due to table dependencies:
 
 ```
-events_raw ──▶ 01_sessionization ──▶ user_sessions
-                                            │
-                                            ▼
-                                     02_funnel ──▶ funnel_sessions
-                                                         │
-                                                         ▼
-                                                  06_powerbi_views ──▶ v_funnel_metrics
-                                                                   ──▶ v_ab_test_summary
+┌─────────────────────────────────────────────────────────────────────┐
+│                        SESSION & FUNNEL                             │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  events_raw ──▶ 01_sessionization ──▶ user_sessions                 │
+│                                             │                       │
+│                                             ▼                       │
+│                                      02_funnel ──▶ funnel_sessions  │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
 
-orders_raw + users_raw ──▶ 03_cohorts ──▶ purchase_cohorts
-                                                │
-                                                ▼
-                                         04/05_retention ──▶ (queries)
-                                                │
-                                                ▼
-                                         06_powerbi_views ──▶ v_cohort_retention
+┌─────────────────────────────────────────────────────────────────────┐
+│                   COHORT RETENTION (User-Based)                     │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  users_raw ──▶ 03_cohort_users ──▶ cohort_users                     │
+│                                         │                           │
+│  orders_raw ──▶ 04_cohort_activity ──▶ cohort_activity              │
+│                                         │                           │
+│                    ┌────────────────────┴────────────────────┐      │
+│                    │                                         │      │
+│                    ▼                                         ▼      │
+│          05_cohort_retention                     06_cohort_sizes    │
+│              (cohort_retention)                   (cohort_sizes)    │
+│                    │                                         │      │
+│                    └────────────────────┬────────────────────┘      │
+│                                         ▼                           │
+│                              07_cohort_retention_rates              │
+│                              (cohort_retention_rates)               │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────┐
+│                         POWER BI VIEWS                              │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  funnel_sessions ──────────────┐                                    │
+│                                ├──▶ 08_powerbi_views ──▶ v_funnel_metrics
+│  cohort_retention_rates ───────┤                      ──▶ v_cohort_retention
+│                                │                      ──▶ v_ab_test_summary
+│                                │                      ──▶ v_ab_test_detailed
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -89,49 +118,73 @@ Aggregates events to session level and creates binary funnel flags:
 
 ---
 
-### 03_cohorts.sql
+### 03_cohort_users.sql
 
-**Input:** `orders_raw`, `users_raw`  
-**Output:** `purchase_cohorts` (table)
+**Input:** `users_raw`  
+**Output:** `cohort_users` (table)
 
-Creates cohort base table for retention analysis:
+Creates base cohort table from ALL users (not just purchasers):
 - **Cohort week**: Week of user signup (`DATE_TRUNC('week', signup_date)`)
+- One row per user
+
+**Critical for correct retention:** Cohort size is based on signups, ensuring retention rates never exceed 100%.
+
+---
+
+### 04_cohort_activity.sql
+
+**Input:** `orders_raw`  
+**Output:** `cohort_activity` (table)
+
+Creates deduplicated purchase activity:
 - **Activity week**: Week of purchase (`DATE_TRUNC('week', ts)`)
-- One row per (user_id, activity_week)
+- Only successful orders (payment_status = 'success')
+- One row per (user_id, activity_week) — deduplicated
 
-**Use case:** Cohort retention analysis, repeat purchase curves
+**Purpose:** Tracks which weeks each user made at least one purchase.
 
 ---
 
-### 04_cohort_retention_query.sql
+### 05_cohort_retention.sql
 
-**Input:** `purchase_cohorts`  
-**Output:** Query results (no table created)
+**Input:** `cohort_users`, `cohort_activity`  
+**Output:** `cohort_retention` (table)
 
-Calculates retention counts:
+Calculates retention counts by cohort and period:
 - **Cohort index**: Weeks since signup (0 = signup week)
-- **Users active**: Distinct users active in each period
+- **Users active**: Distinct users who purchased in that period
 
-**Use case:** Intermediate step for retention rate calculation
+**Join logic:** Inner join cohort_users to cohort_activity on user_id.
 
 ---
 
-### 05_cohort_retention_rates.sql
+### 06_cohort_sizes.sql
 
-**Input:** `purchase_cohorts`  
-**Output:** Query results (no table created)
+**Input:** `cohort_users`  
+**Output:** `cohort_sizes` (table)
 
-Calculates retention rates:
-- **Cohort size**: Users in signup week (cohort_index = 0)
+Calculates cohort size (denominator for retention):
+- **Cohort size**: Total users who signed up in each cohort week
+- Based on ALL signups, not just purchasers
+
+---
+
+### 07_cohort_retention_rates.sql
+
+**Input:** `cohort_retention`, `cohort_sizes`  
+**Output:** `cohort_retention_rates` (table)
+
+Calculates final retention rates:
 - **Retention rate**: users_active / cohort_size
+- Guaranteed to be 0-1 range (never exceeds 100%)
 
-**Use case:** Retention heatmaps, cohort comparison
+**Key insight:** Week 0 retention shows the **conversion rate** (% of users who purchased in their signup week), not 100%.
 
 ---
 
-### 06_powerbi_views.sql
+### 08_powerbi_views.sql
 
-**Input:** `funnel_sessions`, `purchase_cohorts`  
+**Input:** `funnel_sessions`, `cohort_retention_rates`  
 **Output:** Views (not tables)
 
 Creates BI-ready views for Power BI:
@@ -159,7 +212,7 @@ uv run python scripts/materialize_tables.py
 python scripts/materialize_tables.py
 ```
 
-This script executes 01-03 SQL files and creates tables.
+This script executes all SQL files (01-07) and creates all tables with validation.
 
 ### Option 2: Manually in DuckDB CLI
 
@@ -167,11 +220,15 @@ This script executes 01-03 SQL files and creates tables.
 # Open DuckDB
 duckdb analytics.duckdb
 
-# Execute scripts
+# Execute scripts in order
 .read sql/analytics/01_sessionization.sql
 .read sql/analytics/02_funnel.sql
-.read sql/analytics/03_cohorts.sql
-.read sql/analytics/06_powerbi_views.sql
+.read sql/analytics/03_cohort_users.sql
+.read sql/analytics/04_cohort_activity.sql
+.read sql/analytics/05_cohort_retention.sql
+.read sql/analytics/06_cohort_sizes.sql
+.read sql/analytics/07_cohort_retention_rates.sql
+.read sql/analytics/08_powerbi_views.sql
 ```
 
 ### Option 3: Using Python
@@ -200,15 +257,50 @@ conn.close()
 
 ---
 
+## Cohort Retention: Why User-Based Matters
+
+### The Problem with Purchase-Based Cohorts
+
+❌ **Wrong approach:**
+```sql
+-- Cohort size = users who purchased in signup week
+cohort_size = COUNT(DISTINCT user_id) WHERE cohort_index = 0
+```
+This causes retention > 100% because later weeks can have MORE active users than signup week.
+
+✅ **Correct approach (this project):**
+```sql
+-- Cohort size = ALL users who signed up
+cohort_size = COUNT(DISTINCT user_id) FROM cohort_users
+```
+Retention can never exceed 100% because it's always `(subset) / (total signups)`.
+
+### Example Interpretation
+
+| cohort_week | cohort_index | users_active | cohort_size | retention_rate |
+|-------------|--------------|--------------|-------------|----------------|
+| 2024-01-01  | 0            | 450          | 2,500       | 0.18 (18%)     |
+| 2024-01-01  | 1            | 320          | 2,500       | 0.13 (13%)     |
+| 2024-01-01  | 4            | 180          | 2,500       | 0.07 (7%)      |
+
+**Week 0 = 18%** means 18% of users who signed up that week made a purchase in their signup week. This is the **conversion rate**, not "100% retention."
+
+---
+
 ## Validation Queries
 
-Each SQL file contains commented validation queries at the bottom. Uncomment and run to verify:
+Each SQL file contains commented validation queries at the bottom. To verify cohort retention:
 
 ```sql
--- Example: Funnel conversion rates
-SELECT
-    COUNT(*) AS total_sessions,
-    SUM(has_purchase) AS purchases,
-    ROUND(SUM(has_purchase)::DOUBLE / COUNT(*) * 100, 2) AS purchase_rate_pct
-FROM funnel_sessions;
+-- Check no retention exceeds 100%
+SELECT * FROM cohort_retention_rates WHERE retention_rate > 1.0;
+-- Should return 0 rows
+
+-- Verify week 0 is conversion rate (not 100%)
+SELECT 
+    AVG(retention_rate) AS avg_week0_conversion,
+    MIN(retention_rate) AS min_conversion,
+    MAX(retention_rate) AS max_conversion
+FROM cohort_retention_rates 
+WHERE cohort_index = 0;
 ```
