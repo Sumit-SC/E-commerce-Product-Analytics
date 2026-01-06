@@ -28,7 +28,7 @@ __pycache__/
 
 # Jupyter Notebook
 .ipynb_checkpoints
-*.ipynb
+#*.ipynb
 
 # Data files (large)
 data/raw/*.csv
@@ -39,7 +39,7 @@ data/processed/*.parquet
 *.duckdb
 
 # Power BI
-*.pbix
+#*.pbix
 *.pbit
 
 # IDE
