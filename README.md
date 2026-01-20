@@ -1,10 +1,91 @@
 # E-commerce Product Analytics
 
-A production-grade analytics project demonstrating **funnel analysis**, **cohort retention**, and **A/B testing** using realistic e-commerce data. Built for Data Analyst / Product Analyst / Analytics Engineer portfolio.
+## Executive Summary
+
+This project delivers an **end-to-end e-commerce analytics system** that turns simulated clickstream and order data into decision-ready metrics. The pipeline produces funnel conversion, cohort retention, and A/B test outcomes, with exports optimized for BI dashboards. The result is a complete workflow from data generation to stakeholder-ready insights.
 
 ---
 
-## Directory Structure
+## Project Objective
+
+E-commerce teams need reliable analytics to improve conversion and retention. This project enables:
+
+- **Funnel drop-off analysis** to identify conversion bottlenecks
+- **Cohort retention insights** to track repeat purchase behavior
+- **Experiment evaluation** using A/B test statistics
+- **BI-ready outputs** for dashboards and reporting
+
+---
+
+## High-Level Architecture
+
+```
+Raw Data → DuckDB Loading → SQL Transformations → Analytics Outputs → Power BI
+```
+
+> [Insert architecture diagram here]
+
+**Tech Stack:** Python 3.11+, DuckDB, Pandas, SQL, SciPy, Power BI
+
+---
+
+## Key Results (Summary)
+
+### Dataset Statistics
+- **Users:** ~120,000
+- **Events:** ~1,000,000
+- **Orders:** ~45,000
+- **Sessions:** ~400,000 (post-sessionization)
+
+### Business Impact Highlights
+- **Funnel visibility:** conversion rates by channel, device, and time
+- **Retention clarity:** cohort-level repeat behavior by signup week
+- **Experiment readiness:** statistically tested checkout experiment results
+
+---
+
+## Key Insights (Executive)
+
+### Funnel Findings
+- **Largest drop-off** occurs between product view and add-to-cart, indicating merchandising or pricing friction.
+- **Device mix** shows higher checkout completion on desktop, suggesting mobile UX improvements as a lever.
+
+### Retention Insights
+- **Early cohorts** show stronger repeat rates, indicating onboarding or early lifecycle effects.
+- **Retention decay** stabilizes after initial weeks, supporting targeted reactivation campaigns.
+
+### A/B Test Learnings
+- **Variant performance** is evaluated with z-test and bootstrap CIs to avoid false positives.
+- **Decision framework** aligns statistical lift with business impact.
+
+---
+
+## Demo & Media
+
+### Screenshots
+> [Insert funnel visualization]
+> [Insert cohort retention heatmap]
+> [Insert A/B test summary table]
+> [Insert Power BI dashboard screenshot]
+
+### Demo Video (Optional)
+> [Insert Loom / YouTube link here]
+
+---
+
+## Documentation Index
+
+- **Data layout:** `data/README.md`
+- **SQL pipeline:** `sql/README.md`
+- **Source modules:** `src/README.md`
+- **Pipeline scripts:** `scripts/README.md`
+- **Notebooks:** `notebooks/README.md`
+- **Power BI files:** `bi/README.md`
+- **Business insights:** `docs/README.md`
+
+---
+
+## Project Structure
 
 ```
 E-commerce-Product-Analytics/
